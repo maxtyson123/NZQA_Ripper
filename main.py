@@ -59,7 +59,7 @@ def get_standard_info(standard_number):
 
             return {
                 "Standard Number": standard_number,
-                "Standard Title": values[3] + " " + values[4],
+                "Standard Title": " ".join(values[3:]),
                 "Credits": values[0],
                 "Assessment": values[1],
                 "Level": values[2]
@@ -169,18 +169,23 @@ def main(standard_numbers):
         # Check if the standard exists
         if not standard_info:
             print('Error: Standard not found')
-            continue;
+            continue
 
         # Print the standard information
         for key, value in standard_info.items():
             print(f"{key}: {value}")
 
-        # Get the type of exam
-        exam_type = standard_info['Standard Title'].split(', ')[1]
-        save_path = os.path.join(save_path, exam_type)
+        # Get the exam info
+        exam_type = standard_info['Standard Title']
+        assessment = standard_info['Standard Title']
 
-        # Get the assessment
-        assessment = standard_info['Standard Title'].split(', ')[0] + ' ' + standard
+        if "," in standard_info['Standard Title']:
+            assessment = standard_info['Standard Title'].split(', ')[0]
+            exam_type = standard_info['Standard Title'].split(', ')[1]
+
+        assessment += ' ' + standard
+
+        save_path = os.path.join(save_path, exam_type)
         save_path = os.path.join(save_path, assessment)
 
         # Make the directory if it doesn't exist
@@ -204,7 +209,9 @@ def main(standard_numbers):
     stats["Assessment Size"] = convert_size(stats["Assessment Size"])
     stats["Total Size"] = convert_size(stats["Total Size"])
     stats["Total"] = stats["Amount Downloaded"] + stats["Amount Skipped"] + stats["Amount Failed"]
-    stats["Percentage"] = f"{(stats['Amount Downloaded'] / stats['Total']) * 100:.2f}%"
+
+    if stats["Total"] != 0:
+        stats["Percentage"] = f"{(stats['Amount Downloaded'] / stats['Total']) * 100:.2f}%"
 
     print(f"{'=' * 20} Download Complete {'=' * 20}")
     for key, value in stats.items():
