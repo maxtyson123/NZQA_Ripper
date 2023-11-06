@@ -144,6 +144,10 @@ def get_size(path):
             # Add the file's size to the total size
             total_size += os.path.getsize(file_path)
 
+    return total_size
+
+
+def convert_size(total_size):
     for size_unit in ['B', 'KB', 'MB', 'GB', 'TB']:
 
         if total_size < 1024.0:
@@ -151,51 +155,54 @@ def get_size(path):
         total_size /= 1024.0
 
 
-def main(standard):
+def main(standard_numbers):
     start_time = datetime.now()
 
-    # Get the type of exam based on the standard number
-    standard_info = get_standard_info(standard)
+    for standard in standard_numbers:
 
-    # Base save path
-    save_path = os.path.join(os.getcwd(), 'Saved Exams')
+        # Get the type of exam based on the standard number
+        standard_info = get_standard_info(standard)
 
-    # Check if the standard exists
-    if not standard_info:
-        print('Error: Standard not found')
-        sys.exit(1)
+        # Base save path
+        save_path = os.path.join(os.getcwd(), 'Saved Exams')
 
-    # Print the standard information
-    print(f"Standard Number: {standard_info['Standard Number']}")
-    print(f"Standard Title: {standard_info['Standard Title']}")
-    print(f"Credits: {standard_info['Credits']}")
-    print(f"Assessment: {standard_info['Assessment']}")
-    print(f"Level: {standard_info['Level']}")
+        # Check if the standard exists
+        if not standard_info:
+            print('Error: Standard not found')
+            continue;
 
-    # Get the type of exam
-    exam_type = standard_info['Standard Title'].split(', ')[1]
-    save_path = os.path.join(save_path, exam_type)
+        # Print the standard information
+        for key, value in standard_info.items():
+            print(f"{key}: {value}")
 
-    # Get the assessment
-    assessment = standard_info['Standard Title'].split(', ')[0] + ' ' + standard
-    save_path = os.path.join(save_path, assessment)
+        # Get the type of exam
+        exam_type = standard_info['Standard Title'].split(', ')[1]
+        save_path = os.path.join(save_path, exam_type)
 
-    # Make the directory if it doesn't exist
-    if not os.path.exists(save_path):
-        print(f"Creating directory: {save_path}")
-        os.makedirs(save_path)
+        # Get the assessment
+        assessment = standard_info['Standard Title'].split(', ')[0] + ' ' + standard
+        save_path = os.path.join(save_path, assessment)
 
-    for year in YEARS:
-        download_exam(standard, year, save_path, 'Answers')
-        download_exam(standard, year, save_path, 'Assessment')
+        # Make the directory if it doesn't exist
+        if not os.path.exists(save_path):
+            print(f"Creating directory: {save_path}")
+            os.makedirs(save_path)
+
+        for year in YEARS:
+            download_exam(standard, year, save_path, 'Answers')
+            download_exam(standard, year, save_path, 'Assessment')
+
+        stats["Answers Size"] += get_size(os.path.join(save_path, 'Answers'))
+        stats["Assessment Size"] += get_size(os.path.join(save_path, 'Assessment'))
+        stats["Total Size"] += get_size(save_path)
 
     time_taken = datetime.now() - start_time
 
     # Set the other stats
     stats["Time Taken"] = f"{time_taken.seconds // 60} minutes {time_taken.seconds % 60} seconds"
-    stats["Answers Size"] = get_size(os.path.join(save_path, 'Answers'))
-    stats["Assessment Size"] = get_size(os.path.join(save_path, 'Assessment'))
-    stats["Total Size"] = get_size(save_path)
+    stats["Answers Size"] = convert_size(stats["Answers Size"])
+    stats["Assessment Size"] = convert_size(stats["Assessment Size"])
+    stats["Total Size"] = convert_size(stats["Total Size"])
     stats["Total"] = stats["Amount Downloaded"] + stats["Amount Skipped"] + stats["Amount Failed"]
     stats["Percentage"] = f"{(stats['Amount Downloaded'] / stats['Total']) * 100:.2f}%"
 
@@ -241,7 +248,4 @@ if __name__ == '__main__':
             if standard not in standards:
                 standards.append(standard)
 
-
-
-    for standard_number in standards:
-        main(standard_number)
+    main(standards)
