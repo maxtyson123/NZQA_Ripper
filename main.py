@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 YEARS = [2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022]
 ANSWER_URL = "https://www.nzqa.govt.nz/nqfdocs/ncea-resource/schedules/"
 ASSESSMENT_URL = "https://www.nzqa.govt.nz/nqfdocs/ncea-resource/exams/"
+EXEMPLAR_URL = "https://www.nzqa.govt.nz/nqfdocs/ncea-resource/exemplars/"
 
 stats = {
     "Amount Downloaded": 0,
@@ -18,6 +19,7 @@ stats = {
     "Time Taken": 0,
     "Answers Size": 0,
     "Assessment Size": 0,
+    "Exemplar Size": 0,
     "Total Size": 0,
 }
 
@@ -107,17 +109,18 @@ def download_exam(standard, year, save_path, exam_type):
     file = ""
     url = ""
 
-    if exam_type == 'Answers':
-        file = f"{year}/{standard}-ass-{year}.pdf"
-        url = ANSWER_URL
-    else:
-        file = f"{year}/{standard}-exm-{year}.pdf"
-        url = ASSESSMENT_URL
+    match exam_type:
+        case 'Answers':
+            file = f"{standard}-ass-{year}.pdf"
+            url = ANSWER_URL
 
-    # Make the directory for the year
-    year_path = os.path.join(path, f"{year}")
-    if not os.path.exists(year_path):
-        os.makedirs(year_path)
+        case 'Assessment':
+            file = f"{standard}-ass-{year}.pdf"
+            url = ANSWER_URL
+
+        case _:
+            file = f"{standard}-exp-{year}-{exam_type}.pdf"
+            url = EXEMPLAR_URL
 
     full_file = os.path.join(path, file)
 
@@ -128,7 +131,7 @@ def download_exam(standard, year, save_path, exam_type):
         return
 
     # Try download the files
-    download_file(url + file, full_file)
+    download_file(url + f"/{year}/" + file, full_file)
 
 
 def get_size(path):
@@ -196,10 +199,14 @@ def main(standard_numbers):
         for year in YEARS:
             download_exam(standard, year, save_path, 'Answers')
             download_exam(standard, year, save_path, 'Assessment')
+            download_exam(standard, year, save_path, 'Excellence')
+            download_exam(standard, year, save_path, 'Merit')
+            download_exam(standard, year, save_path, 'Achievement')
 
         stats["Answers Size"] += get_size(os.path.join(save_path, 'Answers'))
         stats["Assessment Size"] += get_size(os.path.join(save_path, 'Assessment'))
         stats["Total Size"] += get_size(save_path)
+        stats["Exemplar Size"] += get_size(os.path.join(save_path, 'Excellence')) + get_size(os.path.join(save_path, 'Merit')) + get_size(os.path.join(save_path, 'Achievement'))
 
     time_taken = datetime.now() - start_time
 
