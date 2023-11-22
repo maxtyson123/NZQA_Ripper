@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 import os
 import sys
@@ -61,7 +62,7 @@ def get_standard_info(standard_number):
 
             return {
                 "Standard Number": standard_number,
-                "Standard Title": " ".join(values[3:]),
+                "Standard Title": " ".join(values[3:]).split(" (")[0].strip(),
                 "Credits": values[0],
                 "Assessment": values[1],
                 "Level": values[2]
@@ -161,52 +162,54 @@ def convert_size(total_size):
 def main(standard_numbers):
     start_time = datetime.now()
 
-    for standard in standard_numbers:
+    # Run in parallel
+    with ThreadPoolExecutor() as executor:
+        for standard in standard_numbers:
 
-        # Get the type of exam based on the standard number
-        standard_info = get_standard_info(standard)
+            # Get the type of exam based on the standard number
+            standard_info = get_standard_info(standard)
 
-        # Base save path
-        save_path = os.path.join(os.getcwd(), 'Saved Exams')
+            # Base save path
+            save_path = os.path.join(os.getcwd(), 'Saved Exams')
 
-        # Check if the standard exists
-        if not standard_info:
-            print('Error: Standard not found')
-            continue
+            # Check if the standard exists
+            if not standard_info:
+                print('Error: Standard not found')
+                continue
 
-        # Print the standard information
-        for key, value in standard_info.items():
-            print(f"{key}: {value}")
+            # Print the standard information
+            for key, value in standard_info.items():
+                print(f"{key}: {value}")
 
-        # Get the exam info
-        exam_type = standard_info['Standard Title']
-        assessment = standard_info['Standard Title']
+            # Get the exam info
+            exam_type = standard_info['Standard Title']
+            assessment = standard_info['Standard Title']
 
-        if "," in standard_info['Standard Title']:
-            assessment = standard_info['Standard Title'].split(', ')[0]
-            exam_type = standard_info['Standard Title'].split(', ')[1]
+            if "," in standard_info['Standard Title']:
+                assessment = standard_info['Standard Title'].split(', ')[0]
+                exam_type = standard_info['Standard Title'].split(', ')[1]
 
-        assessment += ' ' + standard
+            assessment += ' ' + standard
 
-        save_path = os.path.join(save_path, exam_type)
-        save_path = os.path.join(save_path, assessment)
+            save_path = os.path.join(save_path, exam_type)
+            save_path = os.path.join(save_path, assessment)
 
-        # Make the directory if it doesn't exist
-        if not os.path.exists(save_path):
-            print(f"Creating directory: {save_path}")
-            os.makedirs(save_path)
+            # Make the directory if it doesn't exist
+            if not os.path.exists(save_path):
+                print(f"Creating directory: {save_path}")
+                os.makedirs(save_path)
 
-        for year in YEARS:
-            download_exam(standard, year, save_path, 'Answers')
-            download_exam(standard, year, save_path, 'Assessment')
-            download_exam(standard, year, save_path, 'Excellence')
-            download_exam(standard, year, save_path, 'Merit')
-            download_exam(standard, year, save_path, 'Achievement')
+            for year in YEARS:
+                executor.submit(download_exam, standard, year, save_path, 'Answers')
+                executor.submit(download_exam, standard, year, save_path, 'Assessment')
+                executor.submit(download_exam, standard, year, save_path, 'Excellence')
+                executor.submit(download_exam, standard, year, save_path, 'Merit')
+                executor.submit(download_exam, standard, year, save_path, 'Achievement')
 
-        stats["Answers Size"] += get_size(os.path.join(save_path, 'Answers'))
-        stats["Assessment Size"] += get_size(os.path.join(save_path, 'Assessment'))
-        stats["Total Size"] += get_size(save_path)
-        stats["Exemplar Size"] += get_size(os.path.join(save_path, 'Excellence')) + get_size(os.path.join(save_path, 'Merit')) + get_size(os.path.join(save_path, 'Achievement'))
+            stats["Answers Size"] += get_size(os.path.join(save_path, 'Answers'))
+            stats["Assessment Size"] += get_size(os.path.join(save_path, 'Assessment'))
+            stats["Total Size"] += get_size(save_path)
+            stats["Exemplar Size"] += get_size(os.path.join(save_path, 'Excellence')) + get_size(os.path.join(save_path, 'Merit')) + get_size(os.path.join(save_path, 'Achievement'))
 
     time_taken = datetime.now() - start_time
 
@@ -215,6 +218,7 @@ def main(standard_numbers):
     stats["Answers Size"] = convert_size(stats["Answers Size"])
     stats["Assessment Size"] = convert_size(stats["Assessment Size"])
     stats["Total Size"] = convert_size(stats["Total Size"])
+    stats["Exemplar Size"] = convert_size(stats["Exemplar Size"])
     stats["Total"] = stats["Amount Downloaded"] + stats["Amount Skipped"] + stats["Amount Failed"]
 
     if stats["Total"] != 0:
