@@ -6,15 +6,89 @@ import sys
 import requests
 from bs4 import BeautifulSoup
 
-YEARS = [2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022]
+YEARS = [2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023]
 ANSWER_URL = "https://www.nzqa.govt.nz/nqfdocs/ncea-resource/schedules/"
 ASSESSMENT_URL = "https://www.nzqa.govt.nz/nqfdocs/ncea-resource/exams/"
 EXEMPLAR_URL = "https://www.nzqa.govt.nz/nqfdocs/ncea-resource/exemplars/"
+
+class Driver:
+    name = ""
+    answer_url = ""
+    assessment_url = ""
+    exemplar_url = ""
+
+    def __init__(self, name, answer_url, assessment_url, exemplar_url):
+        self.name = name
+        self.answer_url = answer_url
+        self.assessment_url = assessment_url
+        self.exemplar_url = exemplar_url
+
+    def get_answer_url(self, standard, year):
+        return self.answer_url
+
+    def get_assessment_url(self, standard, year):
+        return self.assessment_url
+
+    def get_exemplar_url(self, standard, year, exam_type):
+        return self.exemplar_url
+
+
+class NZQA(Driver):
+    def __init__(self):
+        super().__init__("NZQA", "https://www.nzqa.govt.nz/nqfdocs/ncea-resource/schedules/", "https://www.nzqa.govt.nz/nqfdocs/ncea-resource/exams/", "https://www.nzqa.govt.nz/nqfdocs/ncea-resource/exemplars/")
+
+    def get_answer_url(self, standard, year):
+        return f"{self.answer_url}/{year}/{standard}-ass-{year}.pdf"
+
+    def get_assessment_url(self, standard, year):
+        return f"{self.assessment_url}/{year}/{standard}-exm-{year}.pdf"
+
+    def get_exemplar_url(self, standard, year, exam_type):
+        return f"{self.exemplar_url}/{year}/{standard}-exp-{year}-{exam_type}.pdf"
+
+
+class StudyTime(Driver):
+
+    def __init__(self):
+        super().__init__("StudyTime", "https://studytime.co.nz/wp-content/uploads/2024/06/", "https://studytime.co.nz/wp-content/uploads/2024/06/", "")
+
+    def get_answer_url(self, standard, year):
+        return f"{self.answer_url}/{standard}-ass-{year}.pdf"
+
+    def get_assessment_url(self, standard, year):
+        return f"{self.assessment_url}/{standard}-exm-{year}.pdf"
+
+    def get_exemplar_url(self, standard, year, exam_type):
+        return f"https://example.com/driver-no-exam"
+
+class NoBrainTooSmall(Driver):
+    def __init__(self):
+        super().__init__("NoBrainTooSmall", "https://www.nobraintoosmall.co.nz/NCEA/phy3/nqfdocs/ncea-resource/schedules/", "https://www.nobraintoosmall.co.nz/NCEA/phy3/nqfdocs/ncea-resource/exams/", "")
+
+    def get_answer_url(self, standard, year):
+        return f"{self.answer_url}/{year}/{standard}-ass-{year}.pdf"
+
+    def get_assessment_url(self, standard, year):
+        return f"{self.assessment_url}/{year}/{standard}-exm-{year}.pdf"
+
+    def get_exemplar_url(self, standard, year, exam_type):
+        return f"https://example.com/driver-no-exam"
+
+nzqa_driver = NZQA()
+st_driver = StudyTime()
+nbts_driver = NoBrainTooSmall()
+
+drivers = [
+    nzqa_driver,
+    st_driver,
+    nbts_driver
+]
 
 stats = {
     "Amount Downloaded": 0,
     "Amount Skipped": 0,
     "Amount Failed": 0,
+    "Amount Missed": 0,
     "Total": 0,
     "Percentage": 0,
     "Time Taken": 0,
@@ -90,13 +164,17 @@ def download_file(url, save_path):
 
             print(f"Downloaded '{save_path}'")
             stats["Amount Downloaded"] += 1
+            return True
+
         else:
-            print(f"Failed to download {save_path}. Status code: {response.status_code}")
-            stats["Amount Failed"] += 1
+            print(f"Failed to download {url}. Status code: {response.status_code}")
+            stats["Amount Missed"] += 1
+            return False
 
     except Exception as e:
         print(f"An error occurred: {e}")
-        stats["Amount Failed"] += 1
+        stats["Amount Missed"] += 1
+        return False
 
 
 def download_exam(standard, year, save_path, exam_type):
@@ -107,32 +185,42 @@ def download_exam(standard, year, save_path, exam_type):
         print(f"Creating directory: {path}")
         os.makedirs(path)
 
-    file = ""
-    url = ""
+    current_driver = 0
+    while current_driver < len(drivers):
+        driver = drivers[current_driver]
+        url = ""
 
-    match exam_type:
-        case 'Answers':
-            file = f"{standard}-ass-{year}.pdf"
-            url = ANSWER_URL
+        # If NZQA dont have the exam, try the next driver
+        if driver.name != "NZQA":
+            print(f"Trying {driver.name}, {standard} {year} {exam_type}, NZQA doesn't have it")
 
-        case 'Assessment':
-            file = f"{standard}-ass-{year}.pdf"
-            url = ANSWER_URL
+        match exam_type:
+            case 'Answers':
+                url = driver.get_answer_url(standard, year)
 
-        case _:
-            file = f"{standard}-exp-{year}-{exam_type}.pdf"
-            url = EXEMPLAR_URL
+            case 'Assessment':
+                url = driver.get_assessment_url(standard, year)
 
-    full_file = os.path.join(path, file)
+            case _:
+                url = driver.get_exemplar_url(standard, year, exam_type)
 
-    # Check if they have already been downloaded
-    if os.path.exists(full_file):
-        print(f"{year} {exam_type} already downloaded")
-        stats["Amount Skipped"] += 1
-        return
+        file = url.split("/")[-1]
+        full_file = os.path.join(path, file)
 
-    # Try download the files
-    download_file(url + f"/{year}/" + file, full_file)
+        # Check if they have already been downloaded
+        if os.path.exists(full_file):
+            print(f"{year} {exam_type} already downloaded")
+            stats["Amount Skipped"] += 1
+            return
+
+        # Try download the files
+        if download_file(url, full_file):
+            return
+
+        current_driver += 1
+
+    # No drivers have the exam
+    stats["Amount Failed"] += 1
 
 
 def get_size(path):
